@@ -49,7 +49,6 @@
         
         .wall-upload { border: 2px dashed #ccc; padding: 20px; text-align: center; border-radius: 8px; cursor: pointer; margin-top: 10px; }
 
-        /* 追加: アップロード用ボタンのスタイル */
         .upload-area { padding: 10px; background: #f9f9f9; border-bottom: 1px solid #ddd; display: flex; align-items: center; gap: 10px; }
         .upload-label { background: #0078d4; color: #fff; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
     </style>
@@ -96,13 +95,267 @@
         { id:'weather', n:'天気', i:'☀️', t:'web', u:'https://www.windy.com' },
         { id:'video', n:'Video', i:'🎬', t:'web', u:'https://www.youtube.com/embed' },
         { id:'cmd', n:'端末', i:'💻', t:'html', c:'<div class="full pad" style="background:#000;color:#0f0;font-family:monospace;">C:\\Users\\Admin>_</div>' },
-        { id:'bin', n:'ごみ箱', i:'🗑️', t:'html', c:'<div class="pad">空です</div>' }
+        { id:'bin', n:'ごみ箱', i:'🗑️', t:'html', c:'<div class="pad">空です</div>' },
+        { id:'othello', n:'オセロAI', i:'⚪', t:'html', c:`
+            <div class="pad" style="text-align:center; background:#2c3e50; color:white; height:100%;">
+                <div id="oth-msg" style="font-weight:bold; margin-bottom:5px;">あなたの番 (黒)</div>
+                <div id="oth-board" style="display:grid; grid-template-columns:repeat(8, 40px); grid-template-rows:repeat(8, 40px); gap:1px; background:#111; padding:2px; width:328px; margin:0 auto; border:3px solid #34495e;"></div>
+                <button onclick="initOthello()" style="margin-top:10px;">リセット</button>
+            </div>
+            <script>
+                var othB = Array(64).fill(0); var turn = 1; 
+                var dirs = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+                function initOthello(){
+                    othB.fill(0); othB[27]=2; othB[28]=1; othB[35]=1; othB[36]=2; turn=1; drawOth();
+                }
+                function canFlip(idx, color, actualFlip=false){
+                    if(othB[idx]!==0) return false;
+                    let foundTotal = false;
+                    const r = Math.floor(idx/8), c = idx%8;
+                    dirs.forEach(([dr, dc])=>{
+                        let nr = r+dr, nc = c+dc, foundOpp = [];
+                        while(nr>=0 && nr<8 && nc>=0 && nc<8){
+                            let nidx = nr*8+nc;
+                            if(othB[nidx]===0) break;
+                            if(othB[nidx]!==color) foundOpp.push(nidx);
+                            else {
+                                if(foundOpp.length>0){
+                                    foundTotal = true;
+                                    if(actualFlip) foundOpp.forEach(f => othB[f]=color);
+                                }
+                                break;
+                            }
+                            nr+=dr; nc+=dc;
+                        }
+                    });
+                    return foundTotal;
+                }
+                function drawOth(){
+                    const d = document.getElementById('oth-board'); d.innerHTML = '';
+                    othB.forEach((p, i)=>{
+                        const s = document.createElement('div');
+                        s.style = "background:#27ae60; display:flex; align-items:center; justify-content:center; cursor:pointer; border:0.1px solid #16a085;";
+                        if(p) s.innerHTML = '<div style="width:32px; height:32px; border-radius:50%; background:'+(p==1?'#000':'#fff')+'; box-shadow:1px 1px 2px rgba(0,0,0,0.5)"></div>';
+                        else if(turn===1 && canFlip(i, 1)) s.style.background = "#2ecc71";
+                        s.onclick = ()=>moveOth(i); d.appendChild(s);
+                    });
+                    document.getElementById('oth-msg').innerText = turn==1?'あなたの番 (黒)':'AI思考中...';
+                    if(turn===2) setTimeout(aiOth, 600);
+                }
+                function moveOth(i){
+                    if(turn!==1 || !canFlip(i, 1, true)) return;
+                    othB[i]=1; turn=2; drawOth();
+                }
+                function aiOth(){
+                    let moves = [];
+                    othB.forEach((_, i)=>{ if(canFlip(i, 2)) moves.push(i); });
+                    if(moves.length>0){
+                        let best = moves[Math.floor(Math.random()*moves.length)];
+                        canFlip(best, 2, true); othB[best]=2;
+                    }
+                    turn=1; drawOth();
+                    if(!othB.includes(0)) alert("終了！");
+                }
+                setTimeout(initOthello, 100);
+            <\/script>`
+        },
+        { id:'shogi', n:'将棋AI', i:'☖', t:'html', c:`
+            <div class="pad" style="text-align:center; background:#e67e22; height:100%;">
+                <div style="font-size:12px; color:white;">簡易将棋AI (先手:あなた)</div>
+                <div id="sho-board" style="display:grid; grid-template-columns:repeat(9, 36px); grid-template-rows:repeat(9, 36px); gap:1px; background:#5d4037; padding:2px; width:333px; margin:5px auto; border:3px solid #3e2723;"></div>
+                <div id="sho-msg" style="color:white; font-size:12px;">駒を選択してください</div>
+            </div>
+            <script>
+                var sIdx = -1; var sB = Array(81).fill(""); var sTurn = 1;
+                function initSho(){
+                    sB.fill(""); 
+                    const initial = ["香","桂","銀","金","玉","金","銀","桂","香"];
+                    initial.forEach((p,i)=>{ sB[i]="v"+p; sB[72+i]=p; });
+                    for(let i=0;i<9;i++){ sB[18+i]="v歩"; sB[54+i]="歩"; }
+                    drawSho();
+                }
+                function drawSho(){
+                    const d = document.getElementById('sho-board'); d.innerHTML = '';
+                    sB.forEach((p, i)=>{
+                        const s = document.createElement('div');
+                        s.style = "background:#f3d291; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px; font-weight:bold; border:0.5px solid #6d4c41;";
+                        if(i===sIdx) s.style.background = "#ffeb3b";
+                        if(p.startsWith("v")){ s.style.transform="rotate(180deg)"; s.style.color="#d32f2f"; }
+                        s.innerText = p.replace("v","");
+                        s.onclick = ()=>clickSho(i); d.appendChild(s);
+                    });
+                }
+                function clickSho(i){
+                    if(sIdx === -1){
+                        if(sB[i] && !sB[i].startsWith("v")) sIdx = i;
+                    } else {
+                        if(i!==sIdx) { sB[i]=sB[sIdx]; sB[sIdx]=""; sTurn=2; setTimeout(aiSho, 500); }
+                        sIdx = -1;
+                    }
+                    drawSho();
+                }
+                function aiSho(){
+                    let aiP = []; sB.forEach((p,idx)=>{ if(p.startsWith("v")) aiP.push(idx); });
+                    if(aiP.length>0){
+                        let from = aiP[Math.floor(Math.random()*aiP.length)];
+                        let to = from + 9; if(to<81){ sB[to]=sB[from]; sB[from]=""; }
+                    }
+                    sTurn=1; drawSho();
+                }
+                setTimeout(initSho, 100);
+            <\/script>`
+        },
+        { id:'jinsei', n:'人生ゲーム', i:'🎲', t:'html', c:`
+            <div class="pad" style="text-align:center; height:100%; overflow-y:auto; background:#f0f2f5;">
+                <h3 style="margin-top:0;">人生ゲーム AI Edition</h3>
+                <div id="j-board" style="display:grid; grid-template-columns:repeat(5, 1fr); gap:4px; max-width:300px; margin:0 auto; background:#fff; padding:5px; border-radius:8px; border:2px solid #ccc;"></div>
+                <div id="j-roulette" style="font-size:40px; margin:15px; font-weight:bold; color:#e67e22; height:50px;">?</div>
+                <div style="display:flex; justify-content:space-around; margin-bottom:10px;">
+                    <div id="j-p1-stat" style="background:#e3f2fd; padding:5px 10px; border-radius:5px; border-left:4px solid #2196f3; font-size:11px;">
+                        <b>あなた</b><br>資産: <span class="m">1000</span>万<br>職業: <span class="j">学生</span>
+                    </div>
+                    <div id="j-p2-stat" style="background:#fbe9e7; padding:5px 10px; border-radius:5px; border-left:4px solid #ff5722; font-size:11px;">
+                        <b>CPU(AI)</b><br>資産: <span class="m">1000</span>万<br>職業: <span class="j">学生</span>
+                    </div>
+                </div>
+                <div id="j-log" style="height:80px; overflow-y:auto; border:1px solid #ccc; margin:10px 0; padding:5px; font-size:11px; text-align:left; background:#fff;"></div>
+                <button id="j-roll-btn" onclick="startTurn()" style="width:100%; padding:10px; background:#27ae60; color:white; border:none; border-radius:5px; cursor:pointer;">ルーレットを回す！</button>
+            </div>
+            <script>
+                var players = [
+                    {m:1000, pos:0, job:"学生", name:"あなた", isAI:false},
+                    {m:1000, pos:0, job:"学生", name:"CPU", isAI:true}
+                ];
+                var jTurn = 0; 
+                var bSize = 20;
+                var events = [
+                    "スタート","就職した！+200万","給料日！+100万","お宝発見！+300万","火遊びで火事！-500万","転職のチャンス(ITへ)","投資成功！+1000万","ランチ代-1万","宝くじ当選！+500万","給料日！+200万",
+                    "落とし物-10万","臨時ボーナス+300万","無駄遣い-100万","給料日！+400万","仮想通貨暴落！-800万","昇進！+500万","ご祝儀-5万","ギャンブル勝利+200万","最後の給料+500万","ゴール！"
+                ];
+
+                function initJinsei() {
+                    const b = document.getElementById('j-board');
+                    if(!b) return; b.innerHTML = '';
+                    for(let i=0; i<bSize; i++) {
+                        let cell = document.createElement('div');
+                        cell.id = 'cell-' + i;
+                        cell.style = "height:40px; border:1px solid #eee; font-size:9px; display:flex; align-items:center; justify-content:center; position:relative; background:#fafafa;";
+                        cell.innerText = i===0?"S": (i===bSize-1?"G":i);
+                        b.appendChild(cell);
+                    }
+                    updateBoard();
+                }
+
+                function updateBoard() {
+                    for(let i=0; i<bSize; i++) {
+                        const c = document.getElementById('cell-'+i);
+                        if(c) c.innerHTML = i===0?"S": (i===bSize-1?"G":i);
+                    }
+                    players.forEach((p, idx) => {
+                        let piece = document.createElement('div');
+                        piece.style = "width:14px; height:14px; border-radius:50%; position:absolute; z-index:5; border:1px solid #000; transition:0.3s;";
+                        piece.style.background = idx===0?"#2196f3":"#ff5722";
+                        piece.style.bottom = "2px";
+                        piece.style.left = idx===0?"2px":"auto";
+                        piece.style.right = idx===0?"auto":"2px";
+                        const targetCell = document.getElementById('cell-'+p.pos);
+                        if(targetCell) targetCell.appendChild(piece);
+                        
+                        let stat = document.getElementById('j-p'+(idx+1)+'-stat');
+                        if(stat) {
+                            stat.querySelector('.m').innerText = p.m;
+                            stat.querySelector('.j').innerText = p.job;
+                        }
+                    });
+                }
+
+                function startTurn() {
+                    if(jTurn !== 0) return;
+                    document.getElementById('j-roll-btn').disabled = true;
+                    rollRoulette(0);
+                }
+
+                function rollRoulette(pIdx) {
+                    let rElem = document.getElementById('j-roulette');
+                    let count = 0;
+                    let inter = setInterval(() => {
+                        rElem.innerText = Math.floor(Math.random()*10)+1;
+                        count++;
+                        if(count > 20) {
+                            clearInterval(inter);
+                            let finalR = Math.floor(Math.random()*10)+1;
+                            rElem.innerText = finalR;
+                            movePlayer(pIdx, finalR);
+                        }
+                    }, 50);
+                }
+
+                function movePlayer(pIdx, steps) {
+                    let p = players[pIdx];
+                    p.pos += steps;
+                    if(p.pos >= bSize - 1) { p.pos = bSize - 1; }
+                    
+                    let ev = events[p.pos];
+                    let match = ev.match(/\\d+/);
+                    if(match) {
+                        let val = parseInt(match[0]);
+                        if(ev.includes("+")) p.m += val;
+                        if(ev.includes("-")) p.m -= val;
+                    }
+                    if(ev.includes("IT")) p.job = "ITエンジニア";
+                    if(p.job === "学生" && p.pos > 1) p.job = "会社員";
+
+                    const l = document.getElementById('j-log');
+                    if(l) l.innerHTML = "<div><b>["+p.name+"]</b> "+steps+"進んで: "+ev+"</div>" + l.innerHTML;
+                    
+                    updateBoard();
+
+                    if(p.pos === bSize - 1) {
+                        alert(p.name + "がゴールしました！最終資産: " + p.m + "万");
+                        return;
+                    }
+
+                    jTurn = (pIdx === 0) ? 1 : 0;
+                    if(jTurn === 1) {
+                        setTimeout(() => rollRoulette(1), 1500);
+                    } else {
+                        const btn = document.getElementById('j-roll-btn');
+                        if(btn) btn.disabled = false;
+                    }
+                }
+                /* 関数をグローバルに登録してOSから呼び出し可能にする */
+                window.startTurn = startTurn;
+                window.rollRoulette = rollRoulette;
+                window.movePlayer = movePlayer;
+                window.initJinsei = initJinsei;
+                window.updateBoard = updateBoard;
+
+                setTimeout(initJinsei, 100);
+            <\/script>`
+        },
+        { id:'typing', n:'タイピング', i:'⌨️', t:'html', c:`
+            <div class="pad" style="text-align:center;">
+                <div id="t-word" style="font-size:32px; font-family:monospace; margin:20px;">READY?</div>
+                <input type="text" id="t-in" style="font-size:20px; width:90%; text-align:center; padding:5px;" oninput="checkT(this)" autofocus>
+                <div id="t-score" style="margin-top:15px; font-weight:bold;">Score: 0</div>
+            </div>
+            <script>
+                var ws = ["javascript","windows","system","programming","apple","internet","application","code"];
+                var sc=0, cur="";
+                function nextT(){ 
+                    cur=ws[Math.floor(Math.random()*ws.length)]; 
+                    const tw = document.getElementById('t-word');
+                    if(tw) tw.innerText=cur; 
+                }
+                function checkT(e){ if(e.value===cur){ sc+=10; e.value=""; document.getElementById('t-score').innerText="Score: "+sc; nextT(); } }
+                setTimeout(nextT, 500);
+            <\/script>`
+        }
     ];
 
     let zIndex = 1000;
-    let installedIds = JSON.parse(localStorage.getItem('my_apps')) || ['edge', 'einstein', 'store', 'pc', 'calc', 'set'];
+    let installedIds = JSON.parse(localStorage.getItem('my_apps')) || ['edge', 'einstein', 'store', 'pc', 'calc', 'set', 'othello', 'shogi', 'jinsei', 'typing'];
     
-    // 仮想ファイルシステム用
     let uploadedFiles = [];
 
     window.onload = () => {
@@ -180,12 +433,15 @@
             body.innerHTML = `<div class="pad"><h3>設定</h3><div class="wall-upload" onclick="document.getElementById('wall-input').click()">📁 壁紙変更<input type="file" id="wall-input" style="display:none" accept="image/*" onchange="uploadWall(event)"></div><button onclick="localStorage.clear();location.reload()" style="color:red;margin-top:20px;">初期化</button></div>`;
         } else if (a.t === 'clock') {
             setInterval(() => { if(body) body.innerHTML = `<div class="pad" style="font-size:40px; text-align:center; margin-top:100px;">${new Date().toLocaleTimeString()}</div>` }, 1000);
+        } else if (a.t === 'html') {
+            body.innerHTML = a.c;
+            const scs = body.getElementsByTagName('script');
+            for(let s of scs) eval(s.innerHTML);
         } else {
             body.innerHTML = a.c || 'Content';
         }
     }
 
-    // エクスプローラー描画機能の拡張
     function renderExplorer(b) {
         b.innerHTML = `
             <div class="upload-area">
@@ -206,11 +462,9 @@
         updateFileList();
     }
 
-    // ファイルアップロード処理
     window.handleFileUpload = (e, input) => {
         const file = e.target.files[0];
         if (!file) return;
-
         const reader = new FileReader();
         reader.onload = (ev) => {
             uploadedFiles.push({
@@ -220,16 +474,14 @@
                 icon: file.type.startsWith('image/') ? '🖼️' : '📄'
             });
             updateFileList();
-            input.value = ''; // Reset input
+            input.value = ''; 
         };
         reader.readAsDataURL(file);
     };
 
-    // ファイル一覧の更新
     function updateFileList() {
         const container = document.getElementById('custom-files');
         if (!container) return;
-        
         container.innerHTML = uploadedFiles.map((f, index) => `
             <div class="exp-row" ondblclick="viewFile(${index})">
                 ${f.icon} ${f.name}
@@ -237,7 +489,6 @@
         `).join('');
     }
 
-    // ファイルプレビュー
     window.viewFile = (index) => {
         const f = uploadedFiles[index];
         const previewWin = document.createElement('div');
@@ -245,14 +496,12 @@
         previewWin.style.width = '400px'; previewWin.style.height = '400px';
         previewWin.style.top = '100px'; previewWin.style.left = '150px';
         previewWin.style.zIndex = ++zIndex;
-        
         let content = '';
         if (f.type.startsWith('image/')) {
             content = `<img src="${f.data}" style="max-width:100%; max-height:100%; display:block; margin:auto;">`;
         } else {
             content = `<div class="pad" style="word-break:break-all;">${f.name}<br><hr><small>${f.data.substring(0, 500)}...</small></div>`;
         }
-
         previewWin.innerHTML = `
             <div class="win-h">
                 <div>プレビュー: ${f.name}</div>
@@ -340,8 +589,9 @@
     function tglStart() { document.getElementById('start').classList.toggle('open'); }
     function updateTime() {
         const d = new Date();
-        document.getElementById('cl-t').innerText = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-        document.getElementById('cl-d').innerText = d.toLocaleDateString();
+        const ct = document.getElementById('cl-t'), cd = document.getElementById('cl-d');
+        if(ct) ct.innerText = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        if(cd) cd.innerText = d.toLocaleDateString();
     }
     
     window.uploadWall = (e) => {
