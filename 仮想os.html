@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web OS - Pro Web Enabled (Upload Support)</title>
     <style>
+        /* ページ全体は選択禁止 */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 入力フォームやテキストエリアは選択を許可 */
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
         :root { --bg: rgba(255, 255, 255, 0.85); --blur: blur(20px); --accent: #0078d4; }
         body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: 'Segoe UI', Tahoma, sans-serif; background: #000; user-select: none; }
         
@@ -323,13 +334,7 @@
                         if(btn) btn.disabled = false;
                     }
                 }
-                /* 関数をグローバルに登録してOSから呼び出し可能にする */
-                window.startTurn = startTurn;
-                window.rollRoulette = rollRoulette;
-                window.movePlayer = movePlayer;
-                window.initJinsei = initJinsei;
-                window.updateBoard = updateBoard;
-
+                window.startTurn = startTurn; window.rollRoulette = rollRoulette; window.movePlayer = movePlayer; window.initJinsei = initJinsei; window.updateBoard = updateBoard;
                 setTimeout(initJinsei, 100);
             <\/script>`
         },
@@ -350,12 +355,326 @@
                 function checkT(e){ if(e.value===cur){ sc+=10; e.value=""; document.getElementById('t-score').innerText="Score: "+sc; nextT(); } }
                 setTimeout(nextT, 500);
             <\/script>`
+        },
+        { id:'study', n:'学習ドリル', i:'🎒', t:'html', c:`
+            <div class="pad" style="text-align:center; background:#e8f5e9; height:100%; overflow-y:auto; font-family:sans-serif;">
+                <h3 style="margin-top:0; color:#2e7d32; font-size:18px;">🎒 小学生全学年・全教科ドリル</h3>
+                <div style="background:white; padding:8px; border-radius:8px; margin-bottom:10px; display:flex; gap:8px; justify-content:center; border:1px solid #c8e6c9;">
+                    <select id="st-grade" onchange="window.initStudy()" style="padding:4px; font-size:13px; font-weight:bold;">
+                        <option value="1">小学1年生</option><option value="2">小学2年生</option><option value="3">小学3年生</option>
+                        <option value="4">小学4年生</option><option value="5">小学5年生</option><option value="6">小学6年生</option>
+                    </select>
+                    <select id="st-subject" onchange="window.initStudy()" style="padding:4px; font-size:13px; font-weight:bold;">
+                        <option value="sansu">算数 (無限ドリル)</option><option value="kokugo">国語</option>
+                        <option value="rika">理科</option><option value="shakai">社会</option>
+                        <option value="eigo">英語</option>
+                    </select>
+                </div>
+                <div style="background:white; padding:18px; border-radius:8px; min-height:120px; border:1px solid #c8e6c9; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                    <div id="st-q" style="font-size:16px; font-weight:bold; margin-bottom:18px; color:#333; text-align:left; line-height:1.4;"></div>
+                    <div id="st-ans" style="display:grid; grid-template-columns:1fr; gap:10px;"></div>
+                </div>
+                <div id="st-msg" style="margin-top:12px; font-size:18px; font-weight:bold; height:24px;"></div>
+                <div id="st-score" style="margin-top:8px; font-size:13px; color:#555; font-weight:500;">スコア: 0 問正解 / 0 問中</div>
+            </div>
+            <script>
+                var stQ="", stA=[], stC="", stOk=0, stTotal=0;
+                var stData = {
+                    kokugo: {
+                        1: {q:"「いぬ」の最初の文字（ひらがな）はどれ？", a:["い","り","た"], c:"い"},
+                        2: {q:"「新幹線」の正しい読み方はどれ？", a:["しんかんせん","しんがた","でんしゃ"], c:"しんかんせん"},
+                        3: {q:"「反対（はんたい）」の反対の意味の言葉は？", a:["賛成（さんせい）","協力","相談"], c:"賛成（さんせい）"},
+                        4: {q:"「あやまちを（あらた）める」の正しい漢字は？", a:["改める","新める","現める"], c:"改める"},
+                        5: {q:"「ことわざ」で、どんな名人でも失敗することがあるという意味のものは？", a:["猿も木から落ちる","犬も歩けば棒に当たる","猫に小判"], c:"猿も木から落ちる"},
+                        6: {q:"四字熟語「臨機応変（りんきおうへん）」の正しい意味は？", a:["状況の変化に合わせて適切な行動をとること","ずっと同じやり方を守り続けること","急いでその場から逃げ出すこと"], c:"状況の変化に合わせて適切な行動をとること"}
+                    },
+                    rika: {
+                        1: {q:"ヒマワリの花は、一般的に何色をしている？", a:["黄色","青色","赤色"], c:"黄色"},
+                        2: {q:"ダンゴムシを指でやさしくさわるとどうなる？", a:["丸まる","ひっくり返る","羽が生えて飛ぶ"], c:"丸まる"},
+                        3: {q:"昆虫（カブトムシやチョウなど）の足は全部で何本？", a:["6本","8本","4本"], c:"6本"},
+                        4: {q:"太陽や月は、どちらの方角から昇って、どちらの方角へ沈む？", a:["東から昇って西へ沈む","西から昇って東へ沈む","北から昇って南へ沈む"], c:"東から昇って西へ沈む"},
+                        5: {q:"メダカのオスとメスを見分けるとき、背びれに「切り込み」があるのはどっち？", a:["オス","メス","両方にある"], c:"オス"},
+                        6: {q:"水溶液の性質を調べる実験で、酸性の液体につけると「赤色」に変わる紙はどれ？", a:["青色リトマス紙","赤色リトマス紙","普通の白い紙"], c:"青色リトマス紙"}
+                    },
+                    shakai: {
+                        1: {q:"学校でお昼にみんなで一緒に食べるおいしいご飯の時間は？", a:["給食（きゅうしょく）","休み時間","お掃除の時間"], c:"給食（きゅうしょく）"},
+                        2: {q:"町に交番があり、地域の安全を守ってくれるおまわりさんがいる場所は？", a:["警察署・交番","消防署","市役所"], c:"警察署・交番"},
+                        3: {q:"地図記号で、漢字の「文」のマークが表している建物は？", a:["小・中学校（学校）","郵便局","お寺"], c:"小・中学校（学校）"},
+                        4: {q:"日本にある47都道府県の中で、一番面積が広い（大きい）のはどこ？", a:["北海道","東京都","岩手県"], c:"北海道"},
+                        5: {q:"日本の食料自給率（国内で作る割合）がほぼ100%で、主食となっている作物は？", a:["米","小麦","大豆"], c:"米"},
+                        6: {q:"1889年に発布された、日本で最初の近代的な憲法の名前は？", a:["大日本帝国憲法","日本国憲法","十七条憲法"], c:"大日本帝国憲法"}
+                    },
+                    eigo: {
+                        1: {q:"英語で「ありがとう」を伝えるときの正しい言葉は？", a:["Thank you","Hello","Good bye"], c:"Thank you"},
+                        2: {q:"果物の「りんご」を意味する英語はどれ？", a:["apple","banana","orange"], c:"apple"},
+                        3: {q:"数字の「10」を英語で書くとどれ？", a:["ten","eight","nine"], c:"ten"},
+                        4: {q:"曜日の中で「水曜日」を表す英語はどれ？", a:["Wednesday","Monday","Friday"], c:"Wednesday"},
+                        5: {q:"「私はサッカーが好きです」を意味する正しい英文はどれ？", a:["I like soccer.","I play baseball.","He likes soccer."], c:"I like soccer."},
+                        6: {q:"「将来〜になりたい（望む）」を表現するときに使う重要な熟語は？", a:["want to be","have to go","can play"], c:"want to be"}
+                    }
+                };
+                window.initStudy = function(){
+                    var g = document.getElementById('st-grade').value; var s = document.getElementById('st-subject').value;
+                    var qA = document.getElementById('st-q'); var aA = document.getElementById('st-ans'); var msg = document.getElementById('st-msg');
+                    if(msg) msg.innerText = "";
+                    if(s==="sansu"){
+                        var n1, n2, op;
+                        if(g=="1"){ n1=Math.floor(Math.random()*9)+1; n2=Math.floor(Math.random()*9)+1; op="+"; stC=(n1+n2).toString(); }
+                        else if(g=="2"){ n1=Math.floor(Math.random()*9)+1; n2=Math.floor(Math.random()*9)+1; op="×"; stC=(n1*n2).toString(); }
+                        else if(g=="3"){ n1=Math.floor(Math.random()*90)+10; n2=Math.floor(Math.random()*90)+10; op="-"; if(n1<n2){var t=n1;n1=n2;n2=t;} stC=(n1-n2).toString(); }
+                        else if(g=="4"){ n2=Math.floor(Math.random()*9)+1; var ans=Math.floor(Math.random()*9)+1; n1=n2*ans; op="÷"; stC=ans.toString(); }
+                        else if(g=="5"){ n1=Math.floor(Math.random()*9)+1; n2=10; op=" の 1/10 (0.1倍) はいくつ？"; stC=(n1/n2).toString(); }
+                        else if(g=="6"){ n1=Math.floor(Math.random()*4)+1; n2=n1*2; op=" と "+n2+" の比を最も簡単な整数にすると？ 1 : "; stC="2"; }
+                        stQ = g>4 ? n1+op : n1+" "+op+" "+n2+" = ？";
+                        var cV = parseFloat(stC); var w1 = (cV+(g=="5"?0.1:1)).toString(); var w2 = (cV-(g=="5"?0.1:2)).toString(); if(g=="6"){ w1="3"; w2="4"; }
+                        stA = [stC, w1, w2].sort(function(){return Math.random()-0.5;});
+                    } else {
+                        var item = stData[s][g]; stQ = item.q; stC = item.c; stA = item.a.concat().sort(function(){return Math.random()-0.5;});
+                    }
+                    if(qA){
+                        var subN = document.getElementById('st-subject').options[document.getElementById('st-subject').selectedIndex].text;
+                        qA.innerHTML = "<span style='background:#2e7d32; color:white; padding:2px 6px; border-radius:4px; font-size:12px; margin-right:5px;'>"+subN+"</span> " + stQ;
+                    }
+                    if(aA){
+                        aA.innerHTML = "";
+                        stA.forEach(function(ans){
+                            var b = document.createElement('button');
+                            b.style = "padding:10px 14px; font-size:14px; cursor:pointer; background:#fff; border:2px solid #4caf50; border-radius:6px; font-weight:bold; text-align:left; transition:0.1s;";
+                            b.innerText = ans; b.onclick = function(){ window.checkStudy(ans); }; aA.appendChild(b);
+                        });
+                    }
+                };
+                window.checkStudy = function(ans){
+                    var msg = document.getElementById('st-msg'); stTotal++;
+                    if(ans === stC){ if(msg){ msg.style.color="#2e7d32"; msg.innerText="⭕ 正解！素晴らしい！"; } stOk++; } 
+                    else { if(msg){ msg.style.color="#c62828"; msg.innerText="❌ 残念！正解は「"+stC+"」"; } }
+                    var sc = document.getElementById('st-score'); if(sc) sc.innerText = "スコア: " + stOk + " 問正解 / " + stTotal + " 問中";
+                    setTimeout(window.initStudy, 1600);
+                };
+                setTimeout(window.initStudy, 200);
+            <\/script>`
+        },
+        { id:'driver', n:'運転シミュレータ', i:'🚗', t:'html', c:`
+            <div style="background:#111; color:#fff; height:100%; display:flex; flex-direction:column; font-family:sans-serif; user-select:none;">
+                <div style="position:relative; width:100%; flex:1; background:#000; overflow:hidden;">
+                    <canvas id="drv-cv" width="400" height="220" style="width:100%; height:100%; object-fit:contain; display:block;"></canvas>
+                    <div style="position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.6); padding:5px; border-radius:4px; font-size:11px; font-family:monospace; line-height:1.3;">
+                        <div>GEAR: <span id="hud-gear" style="color:#ffeb3b;font-weight:bold;">P</span></div>
+                        <div>ODO: <span id="hud-odo">0.00</span> km</div>
+                        <div>FUEL: <span id="hud-fuel">100</span> %</div>
+                    </div>
+                    <div style="position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.6); padding:5px; border-radius:4px; font-size:11px; font-family:monospace;">
+                        <span id="hud-env" style="color:#00e676;">晴れ</span>
+                    </div>
+                </div>
+                <div style="background:#222; padding:8px; display:grid; grid-template-columns:1.2fr 1fr 1.2fr; gap:8px; border-top:2px solid #444; height:125px; box-sizing:border-box;">
+                    <div style="display:flex; flex-direction:column; justify-content:center; align-items:center; gap:3px;">
+                        <div style="font-size:10px; color:#aaa; font-weight:bold;">STEERING</div>
+                        <div style="display:flex; width:100%; gap:5px;">
+                            <button style="flex:1; height:65px; background:#444; color:#fff; border:1px solid #666; border-radius:6px; font-size:22px; touch-action:none;" onpointerdown="drvSteer(-1)" onpointerup="drvSteer(0)" onpointerleave="drvSteer(0)">◀</button>
+                            <button style="flex:1; height:65px; background:#444; color:#fff; border:1px solid #666; border-radius:6px; font-size:22px; touch-action:none;" onpointerdown="drvSteer(1)" onpointerup="drvSteer(0)" onpointerleave="drvSteer(0)">▶</button>
+                        </div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; justify-content:space-between; align-items:center; padding:2px 0;">
+                        <div style="display:flex; gap:3px; background:#111; padding:3px; border-radius:4px;">
+                            <button id="g-P" onclick="drvSetGear('P')" style="width:24px; height:24px; background:#ff5722; color:#fff; border:none; font-weight:bold; font-size:11px; border-radius:2px;">P</button>
+                            <button id="g-R" onclick="drvSetGear('R')" style="width:24px; height:24px; background:#333; color:#ccc; border:none; font-weight:bold; font-size:11px; border-radius:2px;">R</button>
+                            <button id="g-N" onclick="drvSetGear('N')" style="width:24px; height:24px; background:#333; color:#ccc; border:none; font-weight:bold; font-size:11px; border-radius:2px;">N</button>
+                            <button id="g-D" onclick="drvSetGear('D')" style="width:24px; height:24px; background:#333; color:#ccc; border:none; font-weight:bold; font-size:11px; border-radius:2px;">D</button>
+                        </div>
+                        <div style="display:flex; gap:4px; width:100%;">
+                            <button onclick="drvToggleRain()" style="flex:1; font-size:10px; padding:6px 2px; background:#34495e; color:#fff; border:none; border-radius:4px; font-weight:bold;">🌧️ 雨/晴</button>
+                            <button onclick="drvToggleNight()" style="flex:1; font-size:10px; padding:6px 2px; background:#34495e; color:#fff; border:none; border-radius:4px; font-weight:bold;">🌙 夜/昼</button>
+                        </div>
+                    </div>
+                    <div style="display:flex; width:100%; gap:8px; align-items:flex-end;">
+                        <button style="flex:1; height:80px; background:#555; color:#fff; border:2px solid #777; border-radius:4px; font-weight:bold; font-size:11px; box-shadow:inset 0 0 10px #000; touch-action:none;" onpointerdown="drvBrake(true)" onpointerup="drvBrake(false)" onpointerleave="drvBrake(false)">BRAKE</button>
+                        <button style="flex:1; height:90px; background:#111; color:#fff; border:2px solid #444; border-radius:4px; font-weight:bold; font-size:11px; box-shadow:inset 0 0 10px #000; border-top:5px solid #00e676; touch-action:none;" onpointerdown="drvAccel(true)" onpointerup="drvAccel(false)" onpointerleave="drvAccel(false)">ACCEL</button>
+                    </div>
+                </div>
+            </div>
+            <script>
+                (function(){
+                    var cv = document.getElementById('drv-cv'); if(!cv) return; var ctx = cv.getContext('2d');
+                    var speed = 0, rpm = 800, gear = 'P', odo = 0, fuel = 100;
+                    var isAccel = false, isBrake = false, steerDir = 0, currentSteer = 0;
+                    var pos = 0, playerX = 0, envRain = false, envNight = false, wiperAngle = 0, wiperDir = 1, frame = 0;
+
+                    window.drvSteer = function(d) { steerDir = d; };
+                    window.drvAccel = function(b) { isAccel = b; };
+                    window.drvBrake = function(b) { isBrake = b; };
+                    window.drvSetGear = function(g) {
+                        if(Math.abs(speed) > 3) return; gear = g;
+                        ['P','R','N','D'].forEach(k => {
+                            var btn = document.getElementById('g-'+k);
+                            if(btn) {
+                                btn.style.background = (k===g) ? (k==='P'?'#ff5722':k==='R'?'#e74c3c':k==='D'?'#2ecc71':'#f1c40f') : '#333';
+                                btn.style.color = (k===g) ? '#fff' : '#ccc';
+                            }
+                        });
+                        var hg = document.getElementById('hud-gear'); if(hg) hg.innerText = gear;
+                    };
+                    window.drvToggleRain = function() { envRain = !envRain; updateEnvHud(); };
+                    window.drvToggleNight = function() { envNight = !envNight; updateEnvHud(); };
+                    function updateEnvHud(){ document.getElementById('hud-env').innerText = envRain?(envNight?'豪雨':'雨'):(envNight?'深夜':'晴れ'); }
+
+                    var winEl = document.getElementById('win-driver');
+                    if(winEl) {
+                        winEl.tabIndex = 0;
+                        winEl.addEventListener('keydown', function(e){
+                            if(e.key==='ArrowUp'||e.key==='w') isAccel=true; if(e.key==='ArrowDown'||e.key==='s') isBrake=true;
+                            if(e.key==='ArrowLeft'||e.key==='a') steerDir=-1; if(e.key==='ArrowRight'||e.key==='d') steerDir=1;
+                        });
+                        winEl.addEventListener('keyup', function(e){
+                            if(e.key==='ArrowUp'||e.key==='w') isAccel=false; if(e.key==='ArrowDown'||e.key==='s') isBrake=false;
+                            if(e.key==='ArrowLeft'||e.key==='a'||e.key==='ArrowRight'||e.key==='d') steerDir=0;
+                        });
+                    }
+
+                    function loop() {
+                        if(!document.getElementById('drv-cv')) return; frame++;
+                        
+                        // ブレーキ時と通常時で減速負荷を切り替え
+                        var decel = isBrake ? 1.5 : 0.25;
+
+                        // 【バグ修正】D/Rギアで勝手に走り出さない制御＆リミッター制限
+                        if(gear === 'D') {
+                            if(isAccel && fuel > 0) { 
+                                speed += 0.55; 
+                                rpm += 55; 
+                                // リアルなオートマ自動変速シミュレーション
+                                if(speed < 35 && rpm > 4800) rpm = 2200;
+                                else if(speed < 75 && rpm > 5000) rpm = 2600;
+                                else if(speed < 120 && rpm > 5200) rpm = 3000;
+                                // 最高速スピードリミッター制限 (180km/h)
+                                if(speed > 180) { speed = 180; rpm = 5400; }
+                                fuel -= 0.003;
+                            } else { 
+                                // アクセルOFF時は自然減速し、完全に0で止まる
+                                if(speed > 0) speed = Math.max(0, speed - decel); 
+                                rpm = Math.max(800, rpm - 40);
+                            }
+                        } else if(gear === 'R') {
+                            if(isAccel && fuel > 0) { 
+                                speed -= 0.35; 
+                                rpm += 45; 
+                                if(rpm > 4200) rpm = 3800;
+                                // バック最高速リミッター制限 (-40km/h)
+                                if(speed < -40) { speed = -40; rpm = 4000; }
+                                fuel -= 0.003;
+                            } else { 
+                                if(speed < 0) speed = Math.min(0, speed + decel); 
+                                rpm = Math.max(800, rpm - 40);
+                            }
+                        } else { 
+                            // PまたはNギア（空ぶかし状態）
+                            if(isAccel && fuel > 0) {
+                                rpm += 160;
+                                // 【エンジン限界】6600回転でパパパンと針が跳ね返るレブリミッターを完全再現
+                                if(rpm > 6600) rpm = 6300; 
+                                fuel -= 0.001;
+                            } else {
+                                rpm = Math.max(800, rpm - 110);
+                            }
+                            // 惰性での減速
+                            if(speed > 0) speed = Math.max(0, speed - decel);
+                            if(speed < 0) speed = Math.min(0, speed + decel);
+                        }
+
+                        // フットブレーキによる強制完全停止処理
+                        if(isBrake) {
+                            if(speed > 0) speed = Math.max(0, speed - 1.2);
+                            if(speed < 0) speed = Math.min(0, speed + 1.2);
+                        }
+
+                        // アイドリング回転数（下限800）を絶対維持
+                        if(rpm < 800) rpm = 800;
+
+                        currentSteer += (steerDir * 0.06 - currentSteer) * 0.25;
+                        playerX += currentSteer * (speed * 0.06);
+
+                        var isOffRoad = Math.abs(playerX) > 60; var shakeX = 0, shakeY = 0;
+                        if(isOffRoad && Math.abs(speed) > 5) { speed *= 0.94; shakeX = (Math.random()-0.5)*3; shakeY = (Math.random()-0.5)*3; }
+
+                        pos += speed * 0.6; odo += Math.abs(speed) * 0.000008; if(fuel < 0) fuel = 0;
+                        var ho = document.getElementById('hud-odo'); if(ho) ho.innerText = odo.toFixed(2);
+                        var hf = document.getElementById('hud-fuel'); if(hf) hf.innerText = Math.ceil(fuel);
+
+                        ctx.clearRect(0,0,400,220); ctx.save(); ctx.translate(shakeX, shakeY);
+
+                        var skyGrad = ctx.createLinearGradient(0,0,0,95);
+                        if(envNight) { skyGrad.addColorStop(0, '#06061a'); skyGrad.addColorStop(1, '#111126'); } 
+                        else { skyGrad.addColorStop(0, '#2196f3'); skyGrad.addColorStop(1, '#90caf9'); }
+                        ctx.fillStyle = skyGrad; ctx.fillRect(0,0,400,95);
+
+                        ctx.fillStyle = envNight ? '#ffffff' : '#fffde7';
+                        if(envNight) { for(var i=0; i<12; i++) ctx.fillRect((i*45 + frame/8)%400, 15 + (i%4)*12, 1.5, 1.5); } 
+                        else { ctx.beginPath(); ctx.arc(310, 30, 12, 0, Math.PI*2); ctx.fill(); }
+
+                        ctx.fillStyle = envNight ? '#0b0b18' : '#3e6b40'; ctx.beginPath();
+                        ctx.moveTo(0,95); ctx.lineTo(70,68); ctx.lineTo(150,95); ctx.lineTo(250,60); ctx.lineTo(400,95); ctx.fill();
+
+                        var roadY = 95, camH = 1100, roadW = 1500;
+                        for(var y = 220; y >= roadY; y--) {
+                            var z = camH / (y - roadY); var currentPos = pos + z;
+                            var curveX = Math.sin(currentPos / 350) * 55 + Math.cos(currentPos / 1000) * 35;
+                            var cX = 200 + curveX - (playerX * (y - roadY) * 0.016); var rWidth = roadW / z;
+                            var grassSeg = Math.floor(currentPos / 70) % 2;
+                            ctx.fillStyle = grassSeg == 0 ? (envNight?'#07220e':'#4caf50') : (envNight?'#041609':'#388e3c');
+                            ctx.fillRect(0, y, 400, 1);
+                            ctx.fillStyle = envNight ? '#1e1e1e' : '#3e3e3e'; ctx.fillRect(cX - rWidth/2, y, rWidth, 1);
+                            ctx.fillStyle = grassSeg == 0 ? '#fff' : (envNight?'#444':'#f44336');
+                            ctx.fillRect(cX - rWidth/2 - rWidth*0.03, y, rWidth*0.03, 1);
+                            ctx.fillRect(cX + rWidth/2, y, rWidth*0.03, 1);
+                            if(Math.floor(currentPos / 45) % 2 == 0) { ctx.fillStyle = '#fff'; ctx.fillRect(cX - rWidth*0.01, y, rWidth*0.02, 1); }
+                        }
+
+                        if(envNight) {
+                            var lightGrad = ctx.createRadialGradient(200, 170, 15, 200, 140, 110);
+                            lightGrad.addColorStop(0, 'rgba(255,255,220,0.45)'); lightGrad.addColorStop(0.6, 'rgba(255,255,190,0.1)'); lightGrad.addColorStop(1, 'rgba(0,0,0,0.88)');
+                            ctx.fillStyle = lightGrad; ctx.fillRect(0,0,400,220);
+                        }
+
+                        if(envRain) {
+                            ctx.strokeStyle = 'rgba(156,204,254,0.35)'; ctx.lineWidth = 1;
+                            for(var i=0; i<12; i++) { var rx = Math.random()*400, ry = Math.random()*140; ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 4, ry + 12); ctx.stroke(); }
+                        }
+
+                        ctx.fillStyle = '#151515'; ctx.fillRect(0, 178, 400, 42);
+                        ctx.fillStyle = '#252525'; ctx.strokeStyle = '#353535'; ctx.lineWidth = 2;
+                        ctx.beginPath(); ctx.arc(135, 196, 22, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                        ctx.beginPath(); ctx.arc(265, 196, 22, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+
+                        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.font = '6px monospace'; ctx.fillStyle = '#999'; ctx.fillText("RPM x1000", 118, 187);
+                        var rpmAng = Math.PI * 0.8 + (rpm / 6000) * Math.PI * 1.4; ctx.strokeStyle = '#ff9800'; ctx.lineWidth = 2;
+                        ctx.beginPath(); ctx.moveTo(135,196); ctx.lineTo(135 + Math.cos(rpmAng)*16, 196 + Math.sin(rpmAng)*16); ctx.stroke();
+
+                        ctx.font = '6px monospace'; ctx.fillStyle = '#999'; ctx.fillText("km/h", 258, 187); ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
+                        ctx.fillText(Math.abs(Math.round(speed)), 258, 201);
+                        var spdAng = Math.PI * 0.8 + (Math.abs(speed) / 150) * Math.PI * 1.4; ctx.strokeStyle = '#ff1744'; ctx.lineWidth = 2;
+                        ctx.beginPath(); ctx.moveTo(265,196); ctx.lineTo(265 + Math.cos(spdAng)*16, 196 + Math.sin(spdAng)*16); ctx.stroke();
+
+                        ctx.save(); ctx.translate(200, 204); ctx.rotate(currentSteer * 3.8);
+                        ctx.strokeStyle = '#2d2d2d'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI*2); ctx.stroke();
+                        ctx.strokeStyle = '#444'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-20, 0); ctx.lineTo(20,0); ctx.moveTo(0,0); ctx.lineTo(0, 20); ctx.stroke();
+                        ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2); ctx.fill(); ctx.restore();
+
+                        if(envRain) {
+                            wiperAngle += 0.14 * wiperDir; if(wiperAngle > 1.1) wiperDir = -1; if(wiperAngle < -1.1) wiperDir = 1;
+                            ctx.strokeStyle = 'rgba(10,10,10,0.85)'; ctx.lineWidth = 2.5; ctx.save(); ctx.translate(200, 178); ctx.rotate(wiperAngle);
+                            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -65); ctx.stroke(); ctx.restore();
+                        }
+
+                        ctx.restore(); requestAnimationFrame(loop);
+                    }
+                    setTimeout(() => { window.drvSetGear('P'); loop(); }, 200);
+                })();
+            <\/script>`
         }
     ];
 
     let zIndex = 1000;
-    let installedIds = JSON.parse(localStorage.getItem('my_apps')) || ['edge', 'einstein', 'store', 'pc', 'calc', 'set', 'othello', 'shogi', 'jinsei', 'typing'];
-    
+    let installedIds = JSON.parse(localStorage.getItem('my_apps')) || ['edge', 'einstein', 'store', 'pc', 'calc', 'set', 'othello', 'shogi', 'jinsei', 'typing', 'study', 'driver'];
     let uploadedFiles = [];
 
     window.onload = () => {
@@ -430,7 +749,21 @@
         } else if (a.t === 'store') {
             renderStore(body);
         } else if (a.t === 'settings') {
-            body.innerHTML = `<div class="pad"><h3>設定</h3><div class="wall-upload" onclick="document.getElementById('wall-input').click()">📁 壁紙変更<input type="file" id="wall-input" style="display:none" accept="image/*" onchange="uploadWall(event)"></div><button onclick="localStorage.clear();location.reload()" style="color:red;margin-top:20px;">初期化</button></div>`;
+            body.innerHTML = `
+                <div class="pad">
+                    <h3>設定</h3>
+                    <div class="wall-upload" onclick="document.getElementById('wall-input').click()">📁 壁紙変更<input type="file" id="wall-input" style="display:none" accept="image/*" onchange="uploadWall(event)"></div>
+                    
+                    <div style="margin-top:20px; padding:15px; background:#f5f5f5; border:1px solid #ddd; border-radius:8px;">
+                        <h4 style="margin:0 0 10px 0;">🔐 パスワード変更</h4>
+                        <input type="password" id="change-old-pwd" placeholder="現在のパスワード" style="width:100%; padding:6px; margin-bottom:8px; box-sizing:border-box; border:1px solid #ccc; border-radius:4px;">
+                        <input type="password" id="change-new-pwd" placeholder="新しいパスワード" style="width:100%; padding:6px; margin-bottom:8px; box-sizing:border-box; border:1px solid #ccc; border-radius:4px;">
+                        <button onclick="changeOSPassword()" style="width:100%; padding:8px; background:#0078d4; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:500;">変更を適用</button>
+                        <div id="change-pwd-msg" style="font-size:12px; margin-top:8px; font-weight:500;"></div>
+                    </div>
+
+                    <button onclick="localStorage.clear();location.reload()" style="color:red;margin-top:25px; cursor:pointer;">⚠️ システムの初期化 (パスワードもリセット)</button>
+                </div>`;
         } else if (a.t === 'clock') {
             setInterval(() => { if(body) body.innerHTML = `<div class="pad" style="font-size:40px; text-align:center; margin-top:100px;">${new Date().toLocaleTimeString()}</div>` }, 1000);
         } else if (a.t === 'html') {
@@ -463,50 +796,30 @@
     }
 
     window.handleFileUpload = (e, input) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const file = e.target.files[0]; if (!file) return;
         const reader = new FileReader();
         reader.onload = (ev) => {
-            uploadedFiles.push({
-                name: file.name,
-                type: file.type,
-                data: ev.target.result,
-                icon: file.type.startsWith('image/') ? '🖼️' : '📄'
-            });
-            updateFileList();
-            input.value = ''; 
+            uploadedFiles.push({ name: file.name, type: file.type, data: ev.target.result, icon: file.type.startsWith('image/') ? '🖼️' : '📄' });
+            updateFileList(); input.value = ''; 
         };
         reader.readAsDataURL(file);
     };
 
     function updateFileList() {
-        const container = document.getElementById('custom-files');
-        if (!container) return;
+        const container = document.getElementById('custom-files'); if (!container) return;
         container.innerHTML = uploadedFiles.map((f, index) => `
-            <div class="exp-row" ondblclick="viewFile(${index})">
-                ${f.icon} ${f.name}
-            </div>
-        `).join('');
+            <div class="exp-row" ondblclick="viewFile(${index})">${f.icon} ${f.name}</div>
+         `).join('');
     }
 
     window.viewFile = (index) => {
-        const f = uploadedFiles[index];
-        const previewWin = document.createElement('div');
-        previewWin.className = 'win';
-        previewWin.style.width = '400px'; previewWin.style.height = '400px';
-        previewWin.style.top = '100px'; previewWin.style.left = '150px';
-        previewWin.style.zIndex = ++zIndex;
+        const f = uploadedFiles[index]; const previewWin = document.createElement('div');
+        previewWin.className = 'win'; previewWin.style.width = '400px'; previewWin.style.height = '400px'; previewWin.style.top = '100px'; previewWin.style.left = '150px'; previewWin.style.zIndex = ++zIndex;
         let content = '';
-        if (f.type.startsWith('image/')) {
-            content = `<img src="${f.data}" style="max-width:100%; max-height:100%; display:block; margin:auto;">`;
-        } else {
-            content = `<div class="pad" style="word-break:break-all;">${f.name}<br><hr><small>${f.data.substring(0, 500)}...</small></div>`;
-        }
+        if (f.type.startsWith('image/')) { content = `<img src="${f.data}" style="max-width:100%; max-height:100%; display:block; margin:auto;">`; } 
+        else { content = `<div class="pad" style="word-break:break-all;">${f.name}<br><hr><small>${f.data.substring(0, 500)}...</small></div>`; }
         previewWin.innerHTML = `
-            <div class="win-h">
-                <div>プレビュー: ${f.name}</div>
-                <div class="win-c"><span class="x" onclick="this.closest('.win').remove()">×</span></div>
-            </div>
+            <div class="win-h"><div>プレビュー: ${f.name}</div><div class="win-c"><span class="x" onclick="this.closest('.win').remove()">×</span></div></div>
             <div class="win-b" style="display:flex; align-items:center; justify-content:center; background:#333; color:#fff;">${content}</div>
         `;
         document.body.appendChild(previewWin);
@@ -518,54 +831,29 @@
             const isInstalled = installedIds.includes(a.id);
             html += `<div class="store-item">
                 <span>${a.i}</span><div style="flex:1"><b>${a.n}</b></div>
-                ${isInstalled ? 
-                    `<button class="uninst-btn" onclick="uninstallApp('${a.id}')">アンインストール</button>` : 
-                    `<button onclick="installApp('${a.id}')">インストール</button>`
-                }
+                ${isInstalled ? `<button class="uninst-btn" onclick="uninstallApp('${a.id}')">アンインストール</button>` : `<button onclick="installApp('${a.id}')">インストール</button>`}
             </div>`;
         });
         b.innerHTML = html + '</div>';
     }
 
-    window.installApp = (id) => {
-        if (!installedIds.includes(id)) {
-            installedIds.push(id);
-            saveApps();
-            renderDesktop();
-            refreshStore();
-        }
-    };
-
+    window.installApp = (id) => { if (!installedIds.includes(id)) { installedIds.push(id); saveApps(); renderDesktop(); refreshStore(); } };
     window.uninstallApp = (id) => {
-        if (['store', 'set', 'pc'].includes(id)) {
-            alert('このシステムアプリは削除できません');
-            return;
-        }
-        installedIds = installedIds.filter(appId => appId !== id);
-        saveApps();
-        renderDesktop();
-        const win = document.getElementById('win-' + id);
-        if (win) win.remove();
-        refreshStore();
+        if (['store', 'set', 'pc'].includes(id)) { alert('このシステムアプリは削除できません'); return; }
+        installedIds = installedIds.filter(appId => appId !== id); saveApps(); renderDesktop();
+        const win = document.getElementById('win-' + id); if (win) win.remove(); refreshStore();
     };
-
     function saveApps() { localStorage.setItem('my_apps', JSON.stringify(installedIds)); }
-    
-    function refreshStore() {
-        const storeBody = document.querySelector('#win-store .win-b');
-        if(storeBody) renderStore(storeBody);
-    }
+    function refreshStore() { const storeBody = document.querySelector('#win-store .win-b'); if(storeBody) renderStore(storeBody); }
 
     function navigate(id) {
-        let url = document.getElementById('in-' + id).value;
-        if (!url.startsWith('http')) url = 'https://' + url;
+        let url = document.getElementById('in-' + id).value; if (!url.startsWith('http')) url = 'https://' + url;
         document.getElementById('if-' + id).src = url;
     }
 
     function initCalc(b) {
         b.innerHTML = `<div id="disp" style="height:50px; font-size:30px; text-align:right; padding:10px; background:#eee;">0</div><div style="display:grid; grid-template-columns:repeat(4,1fr); height:calc(100% - 70px);">${"789/456*123-C0=+=".split('').map(k => `<button class="calc-btn" onclick="doCalc('${k}')">${k}</button>`).join('')}</div>`;
     }
-
     window.doCalc = (k) => {
         const d = document.getElementById('disp');
         if (k === 'C') d.innerText = "0";
@@ -574,35 +862,113 @@
     };
 
     function dragWin(e, id) {
-        const el = document.getElementById('win-' + id);
-        el.style.zIndex = ++zIndex;
-        const shiftX = e.clientX - el.getBoundingClientRect().left;
-        const shiftY = e.clientY - el.getBoundingClientRect().top;
+        const el = document.getElementById('win-' + id); el.style.zIndex = ++zIndex;
+        const shiftX = e.clientX - el.getBoundingClientRect().left; const shiftY = e.clientY - el.getBoundingClientRect().top;
         el.setPointerCapture(e.pointerId);
-        el.onpointermove = (ev) => {
-            el.style.left = (ev.clientX - shiftX) + 'px';
-            el.style.top = (ev.clientY - shiftY) + 'px';
-        };
+        el.onpointermove = (ev) => { el.style.left = (ev.clientX - shiftX) + 'px'; el.style.top = (ev.clientY - shiftY) + 'px'; };
         el.onpointerup = () => { el.onpointermove = null; el.releasePointerCapture(e.pointerId); };
     }
 
     function tglStart() { document.getElementById('start').classList.toggle('open'); }
     function updateTime() {
-        const d = new Date();
-        const ct = document.getElementById('cl-t'), cd = document.getElementById('cl-d');
+        const d = new Date(); const ct = document.getElementById('cl-t'), cd = document.getElementById('cl-d');
         if(ct) ct.innerText = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
         if(cd) cd.innerText = d.toLocaleDateString();
     }
     
     window.uploadWall = (e) => {
-        const file = e.target.files[0];
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            document.getElementById('wall').style.backgroundImage = `url(${ev.target.result})`;
-            localStorage.setItem('my_wall', ev.target.result);
-        };
+        const file = e.target.files[0]; const reader = new FileReader();
+        reader.onload = (ev) => { document.getElementById('wall').style.backgroundImage = `url(${ev.target.result})`; localStorage.setItem('my_wall', ev.target.result); };
         reader.readAsDataURL(file);
     };
+
+    window.changeOSPassword = () => {
+        const oldPwd = document.getElementById('change-old-pwd').value; const newPwd = document.getElementById('change-new-pwd').value;
+        const msg = document.getElementById('change-pwd-msg'); const savedPwd = localStorage.getItem('webos_password');
+        if (oldPwd !== savedPwd) { msg.style.color = '#ff4d4d'; msg.innerText = '❌ 現在のパスワードが間違っています。'; return; }
+        if (!newPwd.trim()) { msg.style.color = '#ff4d4d'; msg.innerText = '❌ 新しいパスワードを入力してください。'; return; }
+        localStorage.setItem('webos_password', newPwd); msg.style.color = '#27ae60'; msg.innerText = '✔️ パスワードを変更しました！';
+        document.getElementById('change-old-pwd').value = ''; document.getElementById('change-new-pwd').value = '';
+    };
+
+    /* ==========================================
+       ▼ ログイン＆パスワード設定マネージャー
+       ========================================== */
+    (function() {
+        const style = document.createElement('style');
+        style.innerHTML = `
+            #login-screen {
+                position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(25px);
+                z-index: 99995; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                color: white; font-family: 'Segoe UI', Tahoma, sans-serif; opacity: 1; transition: opacity 0.5s ease;
+            }
+            .login-box {
+                background: rgba(255, 255, 255, 0.1); padding: 35px; border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.2); text-align: center; width: 320px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            }
+            .login-box h2 { margin-top: 0; font-size: 22px; font-weight: 400; }
+            .login-box input {
+                width: 100%; padding: 12px; margin: 18px 0; border-radius: 6px;
+                border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.15);
+                color: white; box-sizing: border-box; font-size: 16px; text-align: center; outline: none; transition: 0.2s;
+            }
+            .login-box input:focus { border-color: #00a1f1; background: rgba(255,255,255,0.25); }
+            .login-box input::placeholder { color: #bbb; }
+            .login-box button {
+                width: 100%; padding: 12px; background: #0078d4; color: white;
+                border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 500; transition: 0.2s;
+            }
+            .login-box button:hover { background: #005a9e; }
+            .login-error { color: #ff4d4d; font-size: 13px; margin-top: 12px; min-height: 18px; }
+        `;
+        document.head.appendChild(style);
+
+        const loginUI = document.createElement('div');
+        loginUI.id = 'login-screen';
+        loginUI.innerHTML = `
+            <div class="login-box" id="login-setup" style="display: none;">
+                <h2>初期パスワード設定</h2>
+                <p style="font-size: 12px; color: #ccc; margin: 0;">Web OSを保護するためのパスワードを決めてください。</p>
+                <input type="password" id="reg-pwd" placeholder="新しいパスワード" autocomplete="new-password">
+                <button id="reg-btn">設定を保存してログイン</button>
+                <div class="login-error" id="reg-error"></div>
+            </div>
+            <div class="login-box" id="login-auth" style="display: none;">
+                <div style="font-size: 56px; margin-bottom: 15px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));">👤</div>
+                <h2>Administrator</h2>
+                <input type="password" id="login-pwd" placeholder="パスワードを入力" autocomplete="current-password">
+                <button id="login-btn">ログイン</button>
+                <div class="login-error" id="login-error"></div>
+            </div>
+        `;
+        document.body.appendChild(loginUI);
+
+        const originalOnload = window.onload;
+        window.onload = () => {
+            if (typeof originalOnload === 'function') originalOnload();
+            const savedPwd = localStorage.getItem('webos_password');
+            if (!savedPwd) { document.getElementById('login-setup').style.display = 'block'; } 
+            else { document.getElementById('login-auth').style.display = 'block'; setTimeout(() => document.getElementById('login-pwd').focus(), 200); }
+
+            document.getElementById('reg-btn').onclick = registerPassword;
+            document.getElementById('reg-pwd').onkeypress = (e) => { if (e.key === 'Enter') registerPassword(); };
+            document.getElementById('login-btn').onclick = checkPassword;
+            document.getElementById('login-pwd').onkeypress = (e) => { if (e.key === 'Enter') checkPassword(); };
+        };
+
+        function registerPassword() {
+            const pwd = document.getElementById('reg-pwd').value; const err = document.getElementById('reg-error');
+            if (!pwd.trim()) { err.innerText = '有効なパスワードを入力してください。'; return; }
+            localStorage.setItem('webos_password', pwd); unlockOS();
+        }
+        function checkPassword() {
+            const pwd = document.getElementById('login-pwd').value; const savedPwd = localStorage.getItem('webos_password'); const err = document.getElementById('login-error');
+            if (pwd === savedPwd) { unlockOS(); } 
+            else { err.innerText = 'パスワードが間違っています。'; document.getElementById('login-pwd').value = ''; document.getElementById('login-pwd').focus(); }
+        }
+        function unlockOS() { const screen = document.getElementById('login-screen'); screen.style.opacity = '0'; setTimeout(() => screen.remove(), 500); }
+    })();
 </script>
 </body>
 </html>
